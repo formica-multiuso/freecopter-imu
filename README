@@ -1,0 +1,3 @@
+Using Chibios 2.4.1
+
+i2c_lld.c issue: 'make clean' and 'make' again
