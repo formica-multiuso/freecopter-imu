@@ -30,4 +30,6 @@ git clone https://github.com/jsnyder/arm-eabi-toolchain arm-cs-tools
 
 Follow his instructions!
 
+NOTE: If you want to have some advanced debugging option for the board, like remote debugging via gdb+openocd, you must re-compile the gdb source code (obtained from th jsnyder script) adding the configure option --with-expat=/usr/local/lib/. So, you need a working copy of 'libexpat' in your system.
+
 ---------------------------
