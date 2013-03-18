@@ -559,6 +559,8 @@ int main(void) {
   chMtxInit(&mtx_l3g);
   chMtxInit(&mtx_filter);
 
+  usbDisconnectBus(&USBD1);
+  chThdSleepMilliseconds(1000);
 
   /*
    * Activates the USB driver and then the USB bus pull-up on D+.
