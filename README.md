@@ -35,3 +35,8 @@ NOTE: If you want to have some advanced debugging option for the board, like rem
 SUGGESTED: You can use also the precompiled toolchain available at https://launchpad.net/gcc-arm-embedded that is already compiled for remote debugging 
 
 ---------------------------
+
+VREP VISUALIZATION
+
+It is possible to visualize the graph of the physical quantities from the IMU using V-REP (http://www.coppeliarobotics.com).
+For more infos please read the vrep/README.vrep file!
