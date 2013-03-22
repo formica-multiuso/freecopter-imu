@@ -78,7 +78,7 @@ int16_t cRPY_16bit[5];
 int16_t intRoll,intPitch,intYaw;
 int16_t rxbuf_16bit[5];
 
-static Mutex mtx_bmp, mtx_lsm, mtx_l3g, mtx_filter;
+static Mutex mtx_sensors, mtx_filter;
 
 
 //=====SPI BUFFERS=========
@@ -435,7 +435,7 @@ static msg_t FilterThread(void *arg) {
 
 
   while (TRUE) {
-	  chMtxLock(&mtx_filter);
+//	  chMtxLock(&mtx_sensors);
 	
 	  complementary_filter();
 	  
@@ -471,59 +471,27 @@ static msg_t FilterThread(void *arg) {
 	  spiReleaseBus(&SPID2);              				/* Ownership release.               */
 
 	  chThdSleepMilliseconds(25);
-	  chMtxUnlock();
+//	  chMtxUnlock();
   }
   return 0;
 }
 
-// Bmp085 Pressure/Temperature Thread
-static WORKING_AREA(PollBmp085ThreadWA, 256);
-static msg_t PollBmp085Thread(void *arg) {
-  chRegSetThreadName("PollBmp085");
-  (void)arg;
-  while (TRUE) {
-    /*chThdSleepMilliseconds(rand() & 31);*/
-    chThdSleepMilliseconds(100);
-    /* Call reading function */
-    chMtxLock(&mtx_bmp);
-    bmp085_read_temp();
-    bmp085_read_press(BMP_MODE_PR0);
-    chMtxUnlock();
+static WORKING_AREA(PollSensorsWA,256);
+static msg_t PollSensorsThread(void *arg) {
+   chRegSetThreadName("PollSensors");
+   (void)arg;
+	systime_t time = chTimeNow();     // T0
+  	while (TRUE) {
+    	time += MS2ST(50);            // Next deadline
+	chMtxLock(&mtx_sensors);
+//	bmp085_read_temp();
+//    	bmp085_read_press(BMP_MODE_PR0);
+	lsm303dlh_read_acceleration();
+    	lsm303dlh_read_magfield();
+//	l3g4200d_gyro_burst();
+    	chThdSleepUntil(time);
+	chMtxUnlock();
   }
-  return 0;
-}
-
-// LSM303DLH Accelerometer/Magnetometer Thread
-static WORKING_AREA(PollLsm303dlhThreadWA, 256);
-static msg_t PollLsm303dlhThread(void *arg) {
-  chRegSetThreadName("PollLsm303dlh");
-  (void)arg;
-  while (TRUE) {
-    /*chThdSleepMilliseconds(rand() & 31);*/
-    chThdSleepMilliseconds(20);
-    /* Call reading function */
-    chMtxLock(&mtx_lsm);
-    lsm303dlh_read_acceleration();
-    lsm303dlh_read_magfield();
-    chMtxUnlock();
-  }
-  return 0;
-}
-
-// L3G4200D Gyroscope Thread
-static WORKING_AREA(PollL3g4200dThreadWA, 256);
-static msg_t PollL3g4200dThread(void *arg) {
-  chRegSetThreadName("PollL3g4200d");
-  (void)arg;
-  while (TRUE) {
-    /*chThdSleepMilliseconds(rand() & 31);*/
-    chThdSleepMilliseconds(20);
-    /* Call reading function */
-    chMtxLock(&mtx_l3g);
-    l3g4200d_gyro_burst();
-    chMtxUnlock();
-  }
-  return 0;
 }
 
 
@@ -553,18 +521,17 @@ int main(void) {
   palSetPadMode(IOPORT2, GPIOB_SPI2NSS, PAL_MODE_OUTPUT_PUSHPULL);
   palSetPad(IOPORT2, GPIOB_SPI2NSS);
 
-
-  chMtxInit(&mtx_bmp);
-  chMtxInit(&mtx_lsm);
-  chMtxInit(&mtx_l3g);
+  
+  chMtxInit(&mtx_sensors);
   chMtxInit(&mtx_filter);
-
-  usbDisconnectBus(&USBD1);
-  chThdSleepMilliseconds(1000);
 
   /*
    * Activates the USB driver and then the USB bus pull-up on D+.
    */
+  
+ // usbDisconnectBus(&USBD1);
+ // chThdSleepMilliseconds(1000);
+
   sduObjectInit(&SDU1);
   sduStart(&SDU1, &serusbcfg);
   usbConnectBus(serusbcfg.usbp);
@@ -581,36 +548,29 @@ int main(void) {
    * Creates the blinker thread.
    */
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, Thread1, NULL);
-  chThdCreateStatic(waFilterThread, sizeof(waFilterThread), NORMALPRIO, FilterThread, NULL);
+//  chThdCreateStatic(waFilterThread, sizeof(waFilterThread), NORMALPRIO, FilterThread, NULL);
 
-  chThdCreateStatic(PollBmp085ThreadWA,
-          sizeof(PollBmp085ThreadWA),
-          NORMALPRIO,
-          PollBmp085Thread,
-          NULL);
-  
-  chThdCreateStatic(PollLsm303dlhThreadWA,
-        sizeof(PollLsm303dlhThreadWA),
-         NORMALPRIO,
-         PollLsm303dlhThread,
-         NULL);
-
-  chThdCreateStatic(PollL3g4200dThreadWA,
-         sizeof(PollL3g4200dThreadWA),
-         NORMALPRIO,
-         PollL3g4200dThread,
-         NULL);
-
+ // chThdCreateStatic(PollSensorsWA, sizeof(PollSensorsWA), NORMALPRIO, PollSensorsThread, NULL);
 
 
   
+  systime_t time = chTimeNow();     // T0
   while (TRUE) {
   
     //chprintf((BaseChannel *)&SDU1,"3\r\n");   
     //chprintf((BaseChannel *)&SDU1, "%f:%f:%f:%f:%f:%f\r\n",x_acc,y_acc,z_acc,x_gyro,y_gyro,z_gyro);
-    
-    chprintf((BaseChannel *)&SDU1, "S:%d:%d:%d:%d:%d:%d:%d:%d:%d:E\r\n",gyroX,gyroY,gyroZ,accelX,accelY,accelZ,magnX,magnY,magnZ);
+    	
+	
+	time += MS2ST(50);            // Next deadline
+//	bmp085_read_temp();
+//    	bmp085_read_press(BMP_MODE_PR0);
+	lsm303dlh_read_acceleration();
+    	lsm303dlh_read_magfield();
+	l3g4200d_gyro_burst();
+   	chprintf((BaseChannel *)&SDU1, "S:%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6d:E\r\n",gyroX,gyroY,gyroZ,accelX,accelY,accelZ,magnX,magnY,magnZ);
+    	chThdSleepUntil(time);
 
-    chThdSleepMilliseconds(100);
+
+
   }
 }

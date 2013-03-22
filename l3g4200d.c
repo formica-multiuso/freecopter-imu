@@ -104,7 +104,7 @@ int l3g4200d_init(void)
 
         i2cAcquireBus(&I2CD1);
 	buffer_tx[0] = CTRL_REG2;
-        buffer_tx[1] = 0x34;
+        buffer_tx[1] = 0x09;
         status = i2cMasterTransmitTimeout(&I2CD1,L3G_ADDR,buffer_tx,2,NULL,0,tmo);
         if (status != RDY_OK){
                  errors[0] = i2cGetErrors(&I2CD1);}
@@ -114,17 +114,17 @@ int l3g4200d_init(void)
         if (status != RDY_OK){
                  errors[1] = i2cGetErrors(&I2CD1);}
 	buffer_tx[0] = CTRL_REG4;
-        buffer_tx[1] = 0x90;	// 0x00 250 deg/sec, 0x10 500 deg/sec, 0x30 2000 deg/sec
+        buffer_tx[1] = 0x50;	// 0x00 250 deg/sec, 0x10 500 deg/sec, 0x30 2000 deg/sec
         status = i2cMasterTransmitTimeout(&I2CD1,L3G_ADDR,buffer_tx,2,NULL,0,tmo);
         if (status != RDY_OK){
                  errors[2] = i2cGetErrors(&I2CD1);}
         buffer_tx[0] = CTRL_REG5;
-        buffer_tx[1] = 0xD3;
+        buffer_tx[1] = 0x00;
         status = i2cMasterTransmitTimeout(&I2CD1,L3G_ADDR,buffer_tx,2,NULL,0,tmo);
         if (status != RDY_OK){
                  errors[3] = i2cGetErrors(&I2CD1);}
 	buffer_tx[0] = CTRL_REG1;
-        buffer_tx[1] = 0xFF;
+        buffer_tx[1] = 0x0F;
         status = i2cMasterTransmitTimeout(&I2CD1,L3G_ADDR,buffer_tx,2,NULL,0,tmo);
         if (status != RDY_OK){
                  errors[4] = i2cGetErrors(&I2CD1);}
@@ -241,7 +241,7 @@ void l3g4200d_gyro_burst(void)
 
 	buffer_txx[0] = FIFO_CTRL_REG;
         buffer_txx[1] = 0x20;
-        status = i2cMasterTransmitTimeout(&I2CD1,L3G_ADDR,buffer_tx,2,NULL,0,tmo);
+        status = i2cMasterTransmitTimeout(&I2CD1,L3G_ADDR,buffer_txx,2,NULL,0,tmo);
         if (status != RDY_OK){
                 g_errors[0] = i2cGetErrors(&I2CD1);}
 
@@ -252,13 +252,13 @@ void l3g4200d_gyro_burst(void)
 
 	buffer_txx[0] = FIFO_CTRL_REG;
         buffer_txx[1] = 0x00;
-        status = i2cMasterTransmitTimeout(&I2CD1,L3G_ADDR,buffer_tx,2,NULL,0,tmo);
+        status = i2cMasterTransmitTimeout(&I2CD1,L3G_ADDR,buffer_txx,2,NULL,0,tmo);
         if (status != RDY_OK){
                 g_errors[2] = i2cGetErrors(&I2CD1);}
 	
-       	gyroX = (buffer_rx[1] << 8) | buffer_rx[0];
-        gyroY = (buffer_rx[3] << 8) | buffer_rx[2];
-        gyroZ = (buffer_rx[5] << 8) | buffer_rx[4];
+       	gyroX = (int16_t)((buffer_rx[0] << 8) | buffer_rx[1]);
+        gyroY = (int16_t)((buffer_rx[2] << 8) | buffer_rx[3]);
+        gyroZ = (int16_t)((buffer_rx[4] << 8) | buffer_rx[5]);
 	
 	i2cReleaseBus(&I2CD1);
 }

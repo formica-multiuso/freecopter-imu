@@ -69,15 +69,17 @@ int lsm303dlh_init(void){
 	if (status != RDY_OK){
                  errors[0] = i2cGetErrors(&I2CD1);}
 	buffer_tx[0] = CTRL_REG2_A;
-	buffer_tx[1] = 0x93;	// BootON, HPCF:0.125@50hz 
+	buffer_tx[1] = 0x00;	 
 	status = i2cMasterTransmitTimeout(&I2CD1,LSM_ADDR_ACC,buffer_tx,2,NULL,0,tmo);
 	if (status != RDY_OK){
                  errors[1] = i2cGetErrors(&I2CD1);}
 	buffer_tx[0] = CTRL_REG4_A;
-	buffer_tx[1] = 0x00;	//0x00 -> 2g (previous 0x40)
+	buffer_tx[1] = 0x40;	//0x00 -> 2g (previous 0x40)
 	status = i2cMasterTransmitTimeout(&I2CD1,LSM_ADDR_ACC,buffer_tx,2,NULL,0,tmo);
 	if (status != RDY_OK){
                  errors[2] = i2cGetErrors(&I2CD1);}
+	
+
 	// Configuring Magnetometer
 	buffer_tx[0] = CRA_REG_M;
 	buffer_tx[1] = 0x18;	//75Hz (previous 0x10)
@@ -132,9 +134,10 @@ void lsm303dlh_read_acceleration(void)
 //                 a_errors[5] = i2cGetErrors(&I2CD1);}
 	i2cReleaseBus(&I2CD1);
 
-	accelX = (int16_t) ((buffer_rx_X[1] << 8) | buffer_rx_X[0]) >> 4;
-	accelY = (int16_t) ((buffer_rx_Y[1] << 8) | buffer_rx_Y[0]) >> 4;
-	accelZ = (int16_t) ((buffer_rx_Z[1] << 8) | buffer_rx_Z[0]) >> 4;
+
+	accelX = (int16_t) ((buffer_rx_X[0] << 8) | buffer_rx_X[1]);
+	accelY = (int16_t) ((buffer_rx_Y[0] << 8) | buffer_rx_Y[1]);
+	accelZ = (int16_t) ((buffer_rx_Z[0] << 8) | buffer_rx_Z[1]);
 }
 
 
