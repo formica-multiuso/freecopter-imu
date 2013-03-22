@@ -1,0 +1,15 @@
+
+To visualize the graphs of the physical quantities from the IMU you have to use V-REP.
+
+This instruction are made for the Linux Version (tested on Ubuntu 12.10)
+
+1. Download the latest version from http://www.coppeliarobotics.com
+2. Copy the directory "imuCollector2" in V-REP-PATH/programming/
+3. Copy the file "imuCollector2_Makefile" in V-REP-PATH/programming
+4. Type 'make -f imuCollector2_Makefile'. This command will generate an object file V-REP-PATH/programming/imuCollector2
+5. Copy the object file generated at point 4 in the main directory of V-REP
+6. TAKE CARE! Run vrep as root: 'sudo sh vrep.sh' 
+7. Open the V-REP scene file imuServer5.ttt
+8. Connect the FreeCopter-IMU to the computer
+9. Push PLAY and run the simulation...
+
