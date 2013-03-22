@@ -3,6 +3,7 @@ freecopter-imu
 Author: Roberto Marino<br>
 Email: formica@ieee.org, roberto.marino@comupter.org<br>
 Last Update: Mar 22 2012 @ 1:00pm<br>
+
 ---------------------------
 
 This is the repository containing the firmware of the IMU (Inertial Measurement Unit) developed for the FreeCopter Project. 
@@ -28,9 +29,9 @@ You can use the script of James Snyder to provide it.
 
 git clone https://github.com/jsnyder/arm-eabi-toolchain arm-cs-tools
 
-SUGGESTED: You can use also the precompiled toolchain available at https://launchpad.net/gcc-arm-embedded 
-
 
 NOTE: If you want to have some advanced debugging option for the board, like remote debugging via gdb+openocd, you must re-compile the gdb source code (obtained from th jsnyder script) adding the configure option --with-expat=/usr/local/lib/. So, you need a working copy of 'libexpat' in your system.
+
+SUGGESTED: You can use also the precompiled toolchain available at https://launchpad.net/gcc-arm-embedded that is already compiled for remote debugging 
 
 ---------------------------
