@@ -1,8 +1,8 @@
 freecopter-imu
 ==============
 Author: Roberto Marino<br>
-Email: formica@ieee.org, roberto.marino@comupter.org
-
+Email: formica@ieee.org, roberto.marino@comupter.org<br>
+Last Update: Mar 22 2012 @ 1:00pm<br>
 ---------------------------
 
 This is the repository containing the firmware of the IMU (Inertial Measurement Unit) developed for the FreeCopter Project. 
