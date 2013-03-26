@@ -40,3 +40,6 @@ VREP VISUALIZATION
 
 It is possible to visualize the graph of the physical quantities from the IMU using V-REP (http://www.coppeliarobotics.com).
 For more infos please read the vrep/README.vrep file!
+See a YOUTUBE video of the FreeCopter-imu working with V-REP:
+
+http://www.youtube.com/watch?v=4m2rMd7Fa-o
