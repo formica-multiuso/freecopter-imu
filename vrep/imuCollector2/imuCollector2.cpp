@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <termios.h>
 #include <unistd.h>
+#include <stdint.h>
 
 extern "C" {
     #include "extApi.h"
@@ -11,7 +12,7 @@ extern "C" {
 }
 
 
-#define PACKET_LENGHT 67
+#define PACKET_LENGHT 129
 
 
 typedef struct data
@@ -29,7 +30,10 @@ typedef struct data
 } inertial_data;                                // Actually not used!
 
 
-int imu_data[9] = {0,0,0,0,0,0,0,0,0};
+int imu_data[18] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+uint32_t tRoll,tPitch,tYaw;
+float Roll,Pitch,Yaw;
+
 
 
 int tokenizer(char *s)
@@ -43,7 +47,7 @@ int tokenizer(char *s)
         for(p=strtok(s,dels); p!=NULL; p=strtok(NULL,dels))
         {
                 //      printf("%s\n",p);
-                if(j>0 && j<11)
+                if(j>0 && j<20)
                         imu_data[i++] = atoi(p);
                 j++;
         }
@@ -103,8 +107,26 @@ int main(int argc, char *argv[])
 			{
 				packet_flag = 0;
 				i = 0;
-				packet[65] = '\0';
+				packet[129] = '\0';
 				tokenizer(packet);
+								
+				tRoll = (uint32_t)((imu_data[9] << 31 & 0x80000000) | (imu_data[10] << 23 & 0x7F800000) | imu_data[11] & 0x007FFFFF);
+	                        tPitch = (uint32_t)((imu_data[12] << 31 & 0x80000000) | (imu_data[13] << 23 & 0x7F800000) | imu_data[14] & 0x007FFFFF);
+        	                tYaw = (uint32_t)((imu_data[15] << 31 & 0x80000000) | (imu_data[16] << 23 & 0x7F800000) | imu_data[17] & 0x007FFFFF);
+	
+        	                Roll = (*(float*)&tRoll);
+                	        Pitch = (*(float*)&tPitch);
+                        	Yaw = (*(float*)&tYaw);
+				
+				if(Roll > 360.0 || Roll < -360.0)
+					Roll = 0.0;
+
+				if(Pitch > 360.0 || Pitch < -360.0)
+					Pitch = 0.0;
+				
+				if(Yaw > 360.0 || Yaw < -360.0)
+					Yaw = 0.0;
+
 				simxSetIntegerSignal("gyroX",imu_data[0],simx_opmode_oneshot);	
 				simxSetIntegerSignal("gyroY",imu_data[1],simx_opmode_oneshot);	
 				simxSetIntegerSignal("gyroZ",imu_data[2],simx_opmode_oneshot);	
@@ -114,9 +136,12 @@ int main(int argc, char *argv[])
 				simxSetIntegerSignal("magnX",imu_data[6],simx_opmode_oneshot);	
 				simxSetIntegerSignal("magnY",imu_data[7],simx_opmode_oneshot);	
 				simxSetIntegerSignal("magnZ",imu_data[8],simx_opmode_oneshot);	
-
+				simxSetFloatSignal("Roll",Roll,simx_opmode_oneshot);
+				simxSetFloatSignal("Pitch",Pitch,simx_opmode_oneshot);
+				simxSetFloatSignal("Yaw",Yaw,simx_opmode_oneshot);
+				
 				//      printf("%s\n",packet);
-				printf(":%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6d:\n",imu_data[0],imu_data[1],imu_data[2],imu_data[3],imu_data[4],imu_data[5],imu_data[6],imu_data[7],imu_data[8]);
+				printf(":%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6f:%6f:%6f\n",imu_data[0],imu_data[1],imu_data[2],imu_data[3],imu_data[4],imu_data[5],imu_data[6],imu_data[7],imu_data[8],Roll,Pitch,Yaw);
 				extApi_sleepMs(5);
 			}
 

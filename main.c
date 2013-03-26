@@ -43,6 +43,8 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
+
 
 #include "ch.h"
 #include "hal.h"
@@ -80,6 +82,10 @@ int16_t rxbuf_16bit[5];
 
 static Mutex mtx_sensors, mtx_filter;
 
+// Mantissa (m), Exponent(e), Sign(s)
+uint32_t Roll_m, Pitch_m, Yaw_m;
+uint32_t Roll_e, Pitch_e, Yaw_e;
+uint32_t Roll_s, Pitch_s, Yaw_s;
 
 //=====SPI BUFFERS=========
 
@@ -384,26 +390,12 @@ static const SPIConfig ls_spicfg = {
 };
 
 
-
-static const ShellCommand commands[] = {
- // {"mem", cmd_mem},
- // {"threads", cmd_threads},
- // {"test", cmd_test},
- // {"read-data", cmd_read_data},
-  {NULL, NULL}
-};
-
-static const ShellConfig shell_cfg1 = {
-  (BaseChannel *)&SDU1,
-  commands
-};
-
 /*===========================================================================*/
 /* Generic code.                                                             */
 /*===========================================================================*/
 
 /*
- * Red LED blinker thread, times are in milliseconds.
+ * Green LED blinker thread, times are in milliseconds.
  */
 
 static WORKING_AREA(waThread1, 128);
@@ -420,78 +412,28 @@ static msg_t Thread1(void *arg) {
   return 0;
 }
 
-static WORKING_AREA(waFilterThread, 128);
-static msg_t FilterThread(void *arg) {
 
-  int8_t spitemp = 0b01010101;
-  (void)arg;
-  chRegSetThreadName("Filter");
-	
+/* Float to integer conversion */
 
-  // State initialization
-  Roll = 0.0;
-  Pitch = 0.0;
-  Yaw = 0.0;
-
-
-  while (TRUE) {
-//	  chMtxLock(&mtx_sensors);
-	
-	  complementary_filter();
-	  
-	  intRoll = (int16_t)(Roll*1000);
-	  intPitch = (int16_t)(Pitch*1000);
-	  intYaw = (int16_t)(Yaw*1000);
-
-	  /* This part is necessary for 8BIT SPI MODE	   
-	 
-	  cRPY[1] = tempRoll & 255;              //LSB
-	  cRPY[0] = tempRoll >> 8;               //MSB
-	                            
-	  cRPY[3] = tempPitch & 255;            //LSB
-	  cRPY[2] = tempPitch >> 8;             //MSB
-	                                                    
-	  cRPY[5] = tempYaw & 255;                //LSB
-	  cRPY[4] = tempYaw >> 8;                 //MSB
-	  
-	  */
-	
-	  cRPY_16bit[0] = 128;
-	  cRPY_16bit[1] = intRoll;
-	  cRPY_16bit[2] = intPitch;
-	  cRPY_16bit[3] = intYaw;
-	  cRPY_16bit[4] = 128;
-	  	  
-	  spiAcquireBus(&SPID2);              				/* Acquire ownership of the bus.    */
-	  spiStart(&SPID2, &ls_spicfg);       				/* Setup transfer parameters.       */
-	  spiSelect(&SPID2);                  				/* Slave Select assertion.          */
-	  spiExchange(&SPID2,10, cRPY_16bit, rxbuf_16bit);       	/* Atomic transfer operations.      */
-	  //spiSend(&SPID2,6,cRPY);
-	  spiUnselect(&SPID2);                				/* Slave Select de-assertion.       */
-	  spiReleaseBus(&SPID2);              				/* Ownership release.               */
-
-	  chThdSleepMilliseconds(25);
-//	  chMtxUnlock();
-  }
-  return 0;
+uint32_t mantissa(float number)
+{
+        uint32_t inumber;
+        inumber = *(uint32_t *)(&number);
+        return (inumber & ((1 << 23) - 1));
 }
 
-static WORKING_AREA(PollSensorsWA,256);
-static msg_t PollSensorsThread(void *arg) {
-   chRegSetThreadName("PollSensors");
-   (void)arg;
-	systime_t time = chTimeNow();     // T0
-  	while (TRUE) {
-    	time += MS2ST(50);            // Next deadline
-	chMtxLock(&mtx_sensors);
-//	bmp085_read_temp();
-//    	bmp085_read_press(BMP_MODE_PR0);
-	lsm303dlh_read_acceleration();
-    	lsm303dlh_read_magfield();
-//	l3g4200d_gyro_burst();
-    	chThdSleepUntil(time);
-	chMtxUnlock();
-  }
+uint32_t exponent(float number)
+{
+        uint32_t inumber;
+        inumber = *(uint32_t *)(&number);
+        return (uint32_t)((inumber >> 23) & 0xFF);
+}
+
+uint32_t sign(float number)
+{
+        uint32_t inumber;
+        inumber = *(uint32_t *)(&number);
+        return ((inumber >> 31) != 0);
 }
 
 
@@ -499,15 +441,8 @@ static msg_t PollSensorsThread(void *arg) {
  * Application entry point.
  */
 int main(void) {
-  Thread *shelltp = NULL;
+  
 
-  /*
-   * System initializations.
-   * - HAL initialization, this also initializes the configured device drivers
-   *   and performs the board-specific initializations.
-   * - Kernel initialization, the main() function becomes a thread and the
-   *   RTOS is active.
-   */
   halInit();
   chSysInit();
   i2c_setup();
@@ -515,13 +450,13 @@ int main(void) {
   lsm303dlh_init();
   l3g4200d_init();
 
+
   palSetPadMode(IOPORT2, 13, PAL_MODE_STM32_ALTERNATE_PUSHPULL);     /* SCK. */
   palSetPadMode(IOPORT2, 14, PAL_MODE_STM32_ALTERNATE_PUSHPULL);     /* MISO.*/
   palSetPadMode(IOPORT2, 15, PAL_MODE_STM32_ALTERNATE_PUSHPULL);     /* MOSI.*/
   palSetPadMode(IOPORT2, GPIOB_SPI2NSS, PAL_MODE_OUTPUT_PUSHPULL);
   palSetPad(IOPORT2, GPIOB_SPI2NSS);
 
-  
   chMtxInit(&mtx_sensors);
   chMtxInit(&mtx_filter);
 
@@ -540,35 +475,24 @@ int main(void) {
   chThdSleepSeconds(3);
 
 
-  /*
-   * Shell manager initialization.
-   */
-
-  /*
-   * Creates the blinker thread.
-   */
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, Thread1, NULL);
-//  chThdCreateStatic(waFilterThread, sizeof(waFilterThread), NORMALPRIO, FilterThread, NULL);
-
- // chThdCreateStatic(PollSensorsWA, sizeof(PollSensorsWA), NORMALPRIO, PollSensorsThread, NULL);
-
-
   
   systime_t time = chTimeNow();     // T0
   while (TRUE) {
   
-    //chprintf((BaseChannel *)&SDU1,"3\r\n");   
-    //chprintf((BaseChannel *)&SDU1, "%f:%f:%f:%f:%f:%f\r\n",x_acc,y_acc,z_acc,x_gyro,y_gyro,z_gyro);
     	
 	
-	time += MS2ST(50);            // Next deadline
+	time += MS2ST(25);            // Next deadline
 //	bmp085_read_temp();
 //    	bmp085_read_press(BMP_MODE_PR0);
 	lsm303dlh_read_acceleration();
     	lsm303dlh_read_magfield();
 	l3g4200d_gyro_burst();
-   	chprintf((BaseChannel *)&SDU1, "S:%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6d:E\r\n",gyroX,gyroY,gyroZ,accelX,accelY,accelZ,magnX,magnY,magnZ);
-    	chThdSleepUntil(time);
+	complementary_filter();
+//   	chprintf((BaseChannel *)&SDU1, "S:%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6d:E\r\n",gyroX,gyroY,gyroZ,accelX,accelY,accelZ,magnX,magnY,magnZ);
+//   	chprintf((BaseChannel *)&SDU1, "S:%6U:%6U:%6U:%6U:%6U:%6U:%6U:%6U:%6U:E\r\n",sign(Roll),exponent(Roll),mantissa(Roll),sign(Pitch),exponent(Pitch),mantissa(Pitch),sign(Yaw),exponent(Yaw),mantissa(Yaw));	
+	chprintf((BaseChannel *)&SDU1, "S:%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6U:%6U:%6U:%6U:%6U:%6U:%6U:%6U:%6U:E\r\n",gyroX,gyroY,gyroZ,accelX,accelY,accelZ,magnX,magnY,magnZ,sign(Roll),exponent(Roll),mantissa(Roll),sign(Pitch),exponent(Pitch),mantissa(Pitch),sign(Yaw),exponent(Yaw),mantissa(Yaw));
+	chThdSleepUntil(time);	     
 
 
 
