@@ -76,9 +76,7 @@ extern float   x_acc,y_acc,z_acc,x_gyro,y_gyro,z_gyro;
 
 int8_t cRoll[2],cPitch[2],cYaw[2];
 int8_t cRPY[6];
-int16_t cRPY_16bit[5];
 int16_t intRoll,intPitch,intYaw;
-int16_t rxbuf_16bit[5];
 
 static Mutex mtx_sensors, mtx_filter;
 
@@ -89,8 +87,10 @@ uint32_t Roll_s, Pitch_s, Yaw_s;
 
 //=====SPI BUFFERS=========
 
-static uint8_t txbuf[5] = {1,56,156,201,124};
-static uint8_t rxbuf;
+int16_t cRPY_16bit[24];
+int16_t rxbuf_16bit[24];
+
+
 
 
 /*===========================================================================*/
@@ -271,7 +271,7 @@ static const USBDescriptor vcom_strings[] = {
  * handled here.
  */
 static const USBDescriptor *get_descriptor(USBDriver *usbp,
-                                           uint8_t dtype,
+                                           int8_t dtype,
                                            uint8_t dindex,
                                            uint16_t lang) {
 
@@ -413,6 +413,7 @@ static msg_t Thread1(void *arg) {
 }
 
 
+
 /* Float to integer conversion */
 
 uint32_t mantissa(float number)
@@ -437,12 +438,32 @@ uint32_t sign(float number)
 }
 
 
+void spi_send_packet(void){
+	spiAcquireBus(&SPID2);                                        /* Acquire ownership of the bus.    */
+  	spiStart(&SPID2, &ls_spicfg);  				      /* Setup transfer parameters.       */	
+	spiSelect(&SPID2);                                            /* Slave Select assertion.          */
+
+	spiExchange(&SPID2,24,cRPY_16bit,rxbuf_16bit);                 /* Atomic transfer operations.      */
+
+	spiUnselect(&SPID2);                                          /* Slave Select de-assertion.       */
+	spiReleaseBus(&SPID2);
+}
+
+
+
+
+
 /*
  * Application entry point.
  */
 int main(void) {
   
+  //uint8_t * r_s,r_e,r_m;
+  //uint8_t * p_s,p_e,p_m;
+  //uint8_t * y_s,y_e,y_m;
+  int16_t prova = 0;
 
+ 
   halInit();
   chSysInit();
   i2c_setup();
@@ -450,7 +471,7 @@ int main(void) {
   lsm303dlh_init();
   l3g4200d_init();
 
-
+  
   palSetPadMode(IOPORT2, 13, PAL_MODE_STM32_ALTERNATE_PUSHPULL);     /* SCK. */
   palSetPadMode(IOPORT2, 14, PAL_MODE_STM32_ALTERNATE_PUSHPULL);     /* MISO.*/
   palSetPadMode(IOPORT2, 15, PAL_MODE_STM32_ALTERNATE_PUSHPULL);     /* MOSI.*/
@@ -472,16 +493,15 @@ int main(void) {
   usbConnectBus(serusbcfg.usbp);
   //palClearPad(GPIOC, GPIOC_USB_DISC);
 
-  chThdSleepSeconds(3);
+  chThdSleepSeconds(1);
 
 
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, Thread1, NULL);
+
   
   systime_t time = chTimeNow();     // T0
   while (TRUE) {
   
-    	
-	
 	time += MS2ST(25);            // Next deadline
 //	bmp085_read_temp();
 //    	bmp085_read_press(BMP_MODE_PR0);
@@ -489,12 +509,74 @@ int main(void) {
     	lsm303dlh_read_magfield();
 	l3g4200d_gyro_burst();
 	complementary_filter();
-//   	chprintf((BaseChannel *)&SDU1, "S:%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6d:E\r\n",gyroX,gyroY,gyroZ,accelX,accelY,accelZ,magnX,magnY,magnZ);
-//   	chprintf((BaseChannel *)&SDU1, "S:%6U:%6U:%6U:%6U:%6U:%6U:%6U:%6U:%6U:E\r\n",sign(Roll),exponent(Roll),mantissa(Roll),sign(Pitch),exponent(Pitch),mantissa(Pitch),sign(Yaw),exponent(Yaw),mantissa(Yaw));	
-	chprintf((BaseChannel *)&SDU1, "S:%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6U:%6U:%6U:%6U:%6U:%6U:%6U:%6U:%6U:E\r\n",gyroX,gyroY,gyroZ,accelX,accelY,accelZ,magnX,magnY,magnZ,sign(Roll),exponent(Roll),mantissa(Roll),sign(Pitch),exponent(Pitch),mantissa(Pitch),sign(Yaw),exponent(Yaw),mantissa(Yaw));
+
+	Roll_s=sign(Roll); 		// 1 bit
+	Roll_e=exponent(Roll);		// 8 bit
+	Roll_m=mantissa(Roll);		// 23 bit
+	Pitch_s=sign(Pitch);		// 1 bit
+	Pitch_e=exponent(Pitch);	// 8 bit
+	Pitch_m=mantissa(Pitch);	// 23 bit
+	Yaw_s=sign(Yaw);		// 1 bit
+	Yaw_e=exponent(Yaw);		// 8 bit
+	Yaw_m=mantissa(Yaw);		// 23 bit
+		
+	
+	cRPY_16bit[0] = (int16_t)Roll_s;
+	cRPY_16bit[1] = (int16_t)(Roll_e & 0xFF);
+        cRPY_16bit[2] = (int16_t)(Roll_m >> 11);
+        cRPY_16bit[3] = (int16_t)(Roll_m & 0x00000FFF);
+        cRPY_16bit[4] = (int16_t)Pitch_s;
+	cRPY_16bit[5] = (int16_t)(Pitch_e & 0xFF);
+	cRPY_16bit[6] = (int16_t)(Pitch_m >> 11);
+	cRPY_16bit[7] = (int16_t)(Pitch_m & 0x00000FFF);
+	cRPY_16bit[8] = (int16_t)Yaw_s;
+	cRPY_16bit[9] = (int16_t)(Yaw_e & 0xFF);
+	cRPY_16bit[10] = (int16_t)(Yaw_m >> 11);
+	cRPY_16bit[11] = (int16_t)(Yaw_m & 0x00000FFF);
+	
+
+/*
+
+	// TEST PACKET -------
+	cRPY_16bit[0] = -32767;
+        cRPY_16bit[1] = 0;
+	cRPY_16bit[2] = 1;
+	cRPY_16bit[3] = 32767;
+	cRPY_16bit[4] = -32761;
+	cRPY_16bit[5] = 0;
+	cRPY_16bit[6] = 1;
+	cRPY_16bit[7] = 32767;
+	cRPY_16bit[8] = -32767;
+	cRPY_16bit[9] = 0;
+	cRPY_16bit[10] = 1;
+	cRPY_16bit[11] = 32767;
+	// END TEST PACKET
+*/
+
+/*
+	cRPY_16bit[0] = prova++;
+	cRPY_16bit[1] = prova++;
+	cRPY_16bit[2] = prova++;
+	cRPY_16bit[3] = prova++;
+	cRPY_16bit[4] = prova++;
+	cRPY_16bit[5] = prova++;
+	cRPY_16bit[6] = prova++;
+	cRPY_16bit[7] = prova++;
+	cRPY_16bit[8] = prova++;
+	cRPY_16bit[9] = prova++;
+	cRPY_16bit[10] = prova++;
+	cRPY_16bit[11] = prova++;
+*/
+
+	spi_send_packet();
+
+
+	if(SDU1.config->usbp->state==USB_ACTIVE)
+	{
+		chprintf((BaseChannel *)&SDU1, "S:%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6d:%6U:%6U:%6U:%6U:%6U:%6U:%6U:%6U:%6U:E\r\n",gyroX,gyroY,gyroZ,accelX,accelY,accelZ,magnX,magnY,magnZ,Roll_s,Roll_e,Roll_m,Pitch_s,Pitch_e,Pitch_m,Yaw_s,Yaw_e,Yaw_m);
+	}
 	chThdSleepUntil(time);	     
 
-
-
   }
+
 }

@@ -48,10 +48,10 @@
 
 #define TAU_C 0.075		// Time-constant
 #define LOOPTIME 20 		// Expressed in milli-seconds
-#define DT 0.02			// Expressed in seconds
+#define DT 0.05			// Expressed in seconds
 #define X_ACC_OFFSET 0
 #define Y_ACC_OFFSET -1
-#define Z_ACC_OFFSET 1124
+#define Z_ACC_OFFSET 16000
 #define X_GYRO_OFFSET -30
 #define Y_GYRO_OFFSET -20
 #define Z_GYRO_OFFSET 0 
